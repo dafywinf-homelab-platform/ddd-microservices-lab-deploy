@@ -21,6 +21,7 @@
       "matchPackageNames": ["ghcr.io/dafywinf/**"],
       "matchUpdateTypes": ["minor", "patch", "digest"],
       "pinDigests": true,
+      "dependencyDashboardApproval": false,
       "automerge": true
     }
   ]
