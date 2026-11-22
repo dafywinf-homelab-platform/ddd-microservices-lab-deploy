@@ -1,0 +1,26 @@
+# inventory-service in SIT: the shared chart (charts/spring-service) with environments/sit/inventory-service.yaml. Synced automatically, so the
+# release Renovate merges into that file is deployed within Argo CD's 3-minute poll.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ddd-microservices-lab-sit-inventory-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dafywinf-homelab-platform/ddd-microservices-lab-deploy.git
+    targetRevision: main
+    path: charts/spring-service
+    helm:
+      releaseName: inventory-service
+      valueFiles:
+        - ../../environments/sit/inventory-service.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ddd-microservices-lab-sit
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,36 @@
+# Defaults for one Spring Boot service. Each environment overrides these in environments/<env>/<service>.yaml.
+
+image:
+  repository: ""
+  # Release version, pinned to its digest: "1.1.0@sha256:...". Renovate updates both when a new release is published
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# The service's server.port
+port: 8080
+
+# Plain environment variables, e.g. SPRING_KAFKA_BOOTSTRAP_SERVERS
+env: {}
+
+# The JVM sizes its heap from the container's memory limit
+javaToolOptions: -XX:MaxRAMPercentage=75
+
+resources: {}
+
+# Spring Boot enables /actuator/health/liveness and /readiness when it detects Kubernetes
+probes:
+  livenessPath: /actuator/health/liveness
+  readinessPath: /actuator/health/readiness
+  # A JVM on a small node can take a minute to start; liveness only starts once this has passed
+  startupFailureThreshold: 30
+
+ingress:
+  enabled: false
+  className: traefik
+  host: ""
+
+# Prometheus scraping, for services that expose /actuator/prometheus
+serviceMonitor:
+  enabled: false
+  path: /actuator/prometheus
+  interval: 30s

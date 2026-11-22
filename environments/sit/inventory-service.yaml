@@ -1,0 +1,25 @@
+# inventory-service in SIT. Renovate moves image.tag to each new release (version and digest) and merges it itself.
+image:
+  repository: ghcr.io/dafywinf/inventory-service
+  tag: 1.1.0@sha256:0108ed981aa67608fb58cefa93a9787393cfe2fc5c2e8acda783a698e876e383
+
+port: 8082
+
+env:
+  SPRING_MONGODB_URI: mongodb://mongo-0.mongo:27017/inventory_db?replicaSet=rs0
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda-0.redpanda:9092
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  host: inventory-service-sit.192-168-86-10.sslip.io
+
+# inventory-service exposes /actuator/prometheus; the cluster's Prometheus picks up ServiceMonitors in any namespace
+serviceMonitor:
+  enabled: true

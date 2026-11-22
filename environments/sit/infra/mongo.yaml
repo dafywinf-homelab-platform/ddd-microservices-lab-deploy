@@ -1,0 +1,102 @@
+# MongoDB for SIT: one node, run as a single-member replica set (rs0) like the platform and the tests, because the
+# services use transactions. Both services' databases (orders, inventory_db) live on it. Same version as the tests.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo
+  labels:
+    app.kubernetes.io/name: mongo
+spec:
+  # Headless: gives the pod the stable name mongo-0.mongo, which is the replica set member's address
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mongo
+  ports:
+    - name: mongo
+      port: 27017
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  labels:
+    app.kubernetes.io/name: mongo
+spec:
+  serviceName: mongo
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongo
+    spec:
+      containers:
+        - name: mongo
+          image: mongo:9.0.8
+          # A small WiredTiger cache: by default it takes half the node's memory, not the container's
+          args: ["--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "0.25"]
+          ports:
+            - name: mongo
+              containerPort: 27017
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        # SIT data is disposable: a node-local volume, not a replicated Longhorn one
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+---
+# After each sync: make the single node a replica set if it isn't one yet. Safe to run again: rs.status() only
+# throws (NotYetInitialized) before the first rs.initiate
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-init-replica-set
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: init
+          image: mongo:9.0.8
+          command:
+            - sh
+            - -c
+            - |
+              for i in $(seq 1 60); do
+                mongosh --quiet --host mongo-0.mongo --eval '
+                  try { rs.status().ok }
+                  catch (e) { rs.initiate({_id: "rs0", members: [{_id: 0, host: "mongo-0.mongo:27017"}]}).ok }
+                ' && exit 0
+                sleep 5
+              done
+              exit 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi

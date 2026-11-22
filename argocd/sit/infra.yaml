@@ -1,0 +1,23 @@
+# SIT infrastructure: MongoDB and Redpanda (environments/sit/infra). Wave -1: running before the services.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ddd-microservices-lab-sit-infra
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dafywinf-homelab-platform/ddd-microservices-lab-deploy.git
+    targetRevision: main
+    path: environments/sit/infra
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ddd-microservices-lab-sit
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

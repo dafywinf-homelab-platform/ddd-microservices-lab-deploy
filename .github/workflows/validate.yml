@@ -1,0 +1,39 @@
+name: Validate
+
+# Renders every environment and checks all manifests against the Kubernetes and CRD schemas. Renovate only
+# automerges a new release into an environment once this has passed on its PR.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v5
+
+      - name: Lint and render each service in each environment
+        run: |
+          mkdir -p rendered
+          for values in environments/*/*.yaml; do
+            env=$(basename "$(dirname "$values")")
+            service=$(basename "$values" .yaml)
+            helm lint charts/spring-service -f "$values" --strict
+            helm template "$service" charts/spring-service -f "$values" --namespace "ddd-microservices-lab-$env" \
+              > "rendered/$env-$service.yaml"
+          done
+
+      - name: Check manifests against their schemas
+        run: |
+          curl -sSfL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz \
+            | tar -xz kubeconform
+          ./kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            rendered environments/*/infra argocd

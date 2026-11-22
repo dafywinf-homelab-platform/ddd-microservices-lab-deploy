@@ -1,0 +1,115 @@
+# Redpanda (Kafka API) for SIT: one broker, the same version and start flags as platform/platform.yml and the tests,
+# but with a smaller memory budget. Only services in this namespace connect, so there is one listener.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+spec:
+  # Headless: gives the broker the stable name redpanda-0.redpanda, which it advertises to clients
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redpanda
+  ports:
+    - name: kafka
+      port: 9092
+    - name: admin
+      port: 9644
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  labels:
+    app.kubernetes.io/name: redpanda
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redpanda
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redpanda
+    spec:
+      containers:
+        - name: redpanda
+          image: redpandadata/redpanda:v26.3.1
+          args:
+            - redpanda
+            - start
+            - --overprovisioned
+            - --smp=1
+            # Redpanda's own memory; the container limit leaves room above it
+            - --memory=512M
+            - --reserve-memory=0M
+            - --node-id=0
+            - --check=false
+            - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+            - --advertise-kafka-addr=PLAINTEXT://redpanda-0.redpanda:9092
+          ports:
+            - name: kafka
+              containerPort: 9092
+            - name: admin
+              containerPort: 9644
+          readinessProbe:
+            httpGet:
+              path: /v1/cluster/health_overview
+              port: admin
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 768Mi
+            limits:
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/redpanda/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        # SIT data is disposable: a node-local volume, not a replicated Longhorn one
+        storageClassName: local-path
+        resources:
+          requests:
+            storage: 5Gi
+---
+# After each sync: create the services' topics, so consumers can subscribe before anything is produced (as
+# redpanda-init does in platform.yml). Safe to run again: an existing topic is described instead
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: redpanda-create-topics
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: create-topics
+          image: redpandadata/redpanda:v26.3.1
+          command:
+            - sh
+            - -c
+            - |
+              for i in $(seq 1 60); do
+                rpk topic create orders.v1 inventory.v1 -X brokers=redpanda-0.redpanda:9092 \
+                  || rpk topic describe orders.v1 inventory.v1 -X brokers=redpanda-0.redpanda:9092 \
+                  && exit 0
+                sleep 5
+              done
+              exit 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi

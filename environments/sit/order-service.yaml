@@ -1,0 +1,23 @@
+# order-service in SIT. Renovate moves image.tag to each new release (version and digest) and merges it itself.
+image:
+  repository: ghcr.io/dafywinf/order-service
+  tag: 1.1.0@sha256:6a89bb2783b69830e419f8706f7049ad937e2c2e3a93f8547ebe879b95c82bb7
+
+port: 8081
+
+env:
+  # order-service's application.yml still uses the Boot 3 key spring.data.mongodb.uri; set both so either works
+  SPRING_MONGODB_URI: mongodb://mongo-0.mongo:27017/orders?replicaSet=rs0
+  SPRING_DATA_MONGODB_URI: mongodb://mongo-0.mongo:27017/orders?replicaSet=rs0
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: redpanda-0.redpanda:9092
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 384Mi
+  limits:
+    memory: 512Mi
+
+ingress:
+  enabled: true
+  host: order-service-sit.192-168-86-10.sslip.io
