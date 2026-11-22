@@ -1,7 +1,7 @@
 # order-service in SIT. Renovate moves image.tag to each new release (version and digest) and merges it itself.
 image:
   repository: ghcr.io/dafywinf/order-service
-  tag: 1.2.0@sha256:5ef8c106ae831f09dc1fac37062da3826bebf625b1abad0eced4f845bd2b1ec9
+  tag: 1.3.0@sha256:b02089dd32fbd1c1205b4edefc3aff33e7f12caac3829e1dfd5d1ae34a44bc4b
 
 port: 8081
 
