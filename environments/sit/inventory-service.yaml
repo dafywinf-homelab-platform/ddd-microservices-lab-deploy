@@ -1,7 +1,7 @@
 # inventory-service in SIT. Renovate moves image.tag to each new release (version and digest) and merges it itself.
 image:
   repository: ghcr.io/dafywinf/inventory-service
-  tag: 1.1.0@sha256:0108ed981aa67608fb58cefa93a9787393cfe2fc5c2e8acda783a698e876e383
+  tag: 1.2.0@sha256:1db644d7d16c0f9659fa3de5ae1f7b819b1e2cc4a0c7f80728b1eb157a0cfad8
 
 port: 8082
 
